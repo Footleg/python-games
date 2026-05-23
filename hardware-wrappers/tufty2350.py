@@ -65,12 +65,12 @@ class Hardware_Wrapper:
 
     KEY_UP = BUTTON_UP
     KEY_DOWN = BUTTON_DOWN
-
     KEY_LEFT = KEY_A
-    KEY_START = KEY_B
     KEY_RIGHT = KEY_C
-    KEY_FIRE = KEY_UP
-    KEY_RUN = KEY_DOWN
+
+    KEY_START = KEY_B
+    KEY_FIRE = KEY_A
+    KEY_RUN = KEY_C
 
 
     def __init__(self):

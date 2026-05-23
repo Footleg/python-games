@@ -85,7 +85,7 @@ class Hardware_Wrapper:
         self.height = h
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Tufty2350 Badge Emulator")
-        self.font = pygame.freetype.SysFont('Arial', 18)
+        self.font = pygame.freetype.SysFont('Arial', 12)
         self.black = [0, 0, 0]
         self.white = [255, 255, 255]
         self.red = [255, 0, 0]
@@ -94,6 +94,9 @@ class Hardware_Wrapper:
         self.yellow = [255, 255, 0]
         self.keys_held = {}  # Track keys being held
         self.should_quit = False
+
+    def set_font(self, name, size):
+        self.font = pygame.freetype.SysFont(name, size)
 
     def fill(self, color):
         self.screen.fill(color)
