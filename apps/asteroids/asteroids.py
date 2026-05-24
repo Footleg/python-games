@@ -37,7 +37,7 @@ class Obj_point():
         self.x = 0
         self.y = 0
 
-class Ship():
+class Vector_Object():
     """ Used for all vector objects (ship, asteroids, letters for game messages) """
     def __init__(self, ptdeg, ptrad, pts, tumble, x, y, size, display):
         self.x = x # 230000 
@@ -46,7 +46,7 @@ class Ship():
         self.ay = 0 #randint(-40,40)*10 # accel y 
         self.deg = 0                 # degrees obj is pointing
         self.size = size             # size of obj
-        self.coll = self.size*5      # collision h and w
+        self.coll = self.size * 5    # collision h and w (converted to mean radius using calc_coll later)
         self.exp = 0                 # explode progression
         self.damage = True           # ship can take damage
         self.pt = []                 # active points
@@ -59,6 +59,14 @@ class Ship():
         self.colour = display.white #0x008A
         self.fps = 25                # Controls game animations so initialise to target fps
         self.active_exhaust = 0
+
+    def calc_coll(self, scale=1.0):
+        """ Sets collision radius to mean of object points radius """
+        mean_rad = 0
+        for i in range(len(self.ptrad)-1):
+            mean_rad += self.ptrad[i];
+        mean_rad = int(self.size * scale * mean_rad) // (len(self.ptrad)-1)
+        self.coll = mean_rad
 
 class Score():
     def __init__(self):
@@ -83,7 +91,7 @@ let_rad = []
 # Score digit definitions
 score_deg = []
 score_rad = []
-scoring = [0,100,50,20,200,1000] # points
+scoring = [0,100,50,30,20,15,10,4,2,1] # points
 
 let_deg.append([54,270,126,90,54])                      # A
 let_rad.append([17,18,17,4,17])
@@ -160,11 +168,14 @@ class AsteroidsGame:
         self.KEY_FIRE = hardware.KEY_FIRE
         self.KEY_RUN = hardware.KEY_RUN
         
-        # Game parameters, depend on screen area
-        self.initial_asteroids = 1 + hardware.width // 200
+        # Game parameters affecting difficulty. Some depend on screen area
+        self.asteroid_max_size = int(sqrt(hardware.width / 30))
+        self.initial_asteroids = 1 + hardware.width // 250
         self.asteroid_inc = max(self.initial_asteroids // 2, 1)
-        self.max_asteroids = self.initial_asteroids + self.asteroid_inc * 10 # Max 10 levels
+        self.max_asteroids = (self.initial_asteroids + self.asteroid_inc * 10) * self.asteroid_max_size # Max 10 levels
         self.max_missiles = hardware.width // 40
+        self.hitbox_debug = False
+        self.hitbox_scale = 0.9 # 1.0 is exact mean object size
 
         # Game state
         self.game_mode = GAME_MODE.TITLE
@@ -204,7 +215,6 @@ class AsteroidsGame:
         self.num_asteroids = self.initial_asteroids    # number of asteroids to start level
         self.active_asteroids = self.num_asteroids
         self.asteroid_count = 0
-        self.explode_clean_token = False
     
     def _init_shades(self):
         """Initialize colour shade arrays."""
@@ -294,7 +304,7 @@ class AsteroidsGame:
                     # Stop enlarging letters
                     i.tumble = 0
                     
-                self._draw_object2(i, False)
+                self._draw_object(i, False)
                 offset_x += 1
             
             if still_growing:
@@ -312,7 +322,7 @@ class AsteroidsGame:
                 self.lett_exp_next += 1
                 # Wipe letter out
                 i.size = 0
-                self._draw_object2(i, False)
+                self._draw_object(i, False)
             else:
                 # Iterate explosion one frame
                 if i.exp < 10:
@@ -384,7 +394,7 @@ class AsteroidsGame:
         while num > 0:
             digit = num % 10
             self.score_list[digit].x = self.MAX_X * 21 // 32 - places
-            self._draw_object2(self.score_list[digit], False)
+            self._draw_object(self.score_list[digit], False)
             num //= 10
             places += 30 * self.SCALE
 
@@ -398,7 +408,7 @@ class AsteroidsGame:
         self.over_list[1].back_colour = self.display.black # Black for first draw so old position is erased
         for i in range(0, self.score.lives):
             self.over_list[1].x -= self.SCALE * 20
-            self._draw_object2(self.over_list[1], False)
+            self._draw_object(self.over_list[1], False)
             # Set back colour to match front so that it acts as a stamp as marker is drawn next
             self.over_list[1].back_colour = self.over_list[1].colour
 
@@ -436,7 +446,7 @@ class AsteroidsGame:
     
     def _init_obj(self, ptdeg, ptrad, pts, tumble, x, y, size):
         """Create a game object."""
-        obj = Ship(ptdeg, ptrad, pts, tumble, x, y, size, self.display)
+        obj = Vector_Object(ptdeg, ptrad, pts, tumble, x, y, size, self.display)
         for i in range(0, obj.pts):
             obj.pt.append(Obj_point())
         return obj
@@ -445,8 +455,8 @@ class AsteroidsGame:
         """Create asteroids list one time."""
         for j in range(0, self.max_asteroids):
             self.asteroid.append(self._init_obj([0, 60, 120, 180, 240, 300, 0],
-                                                 [7] + [randint(6, 9) for _ in range(5)] + [7],
-                                                 14, rotn[randint(0, 5)], 0, 0, 3 * self.SCALE + 1))
+                                                [7] + [randint(6, 9) for _ in range(5)] + [7],
+                                                14, rotn[randint(0, 5)], 0, 0, 3 * self.SCALE + 1))
             self._perimeter(self.asteroid[j], self.MAX_X, self.MAX_Y)
             self.asteroid[j].ax = randint(-40, 40) * 40
             self.asteroid[j].ay = randint(-40, 40) * 40
@@ -462,8 +472,8 @@ class AsteroidsGame:
         for i in range(0, self.num_asteroids):
             self.asteroid[i].active = True
             self._perimeter(self.asteroid[i], self.MAX_X, self.MAX_Y)
-            self.asteroid[i].size = 3001
-            self.asteroid[i].coll = self.asteroid[i].size * 5
+            self.asteroid[i].size = self.SCALE * self.asteroid_max_size + 1
+            self.asteroid[i].calc_coll(self.hitbox_scale)
             self.asteroid[i].tumble = rotn[randint(0, 5)]
             self.asteroid[i].exp = 0
             self.asteroid[i].ax = randint(-40, 40) * 20
@@ -498,16 +508,22 @@ class AsteroidsGame:
         """Draw a line, scaled to screen co-ordinates."""
         self.display.line(x1 // self.SCALE, y1 // self.SCALE, x2 // self.SCALE, y2 // self.SCALE, colour)
     
+    def _draw_circle(self, x1, y1, r, colour):
+        """Draw a circle, scaled to screen co-ordinates."""
+        self.display.circle(x1 // self.SCALE, y1 // self.SCALE, r // self.SCALE, colour, False)
+    
     def _draw_point(self, x, y, colour):
         """Draw a pixel, scaled to screen co-ordinates."""
         self.display.pixel(int(x // self.SCALE), int(y // self.SCALE), colour)
     
-    def _draw_object2(self, obj, explode):
+    def _draw_object(self, obj, explode, hitbox=False):
         """Draw game object."""
         for i in range(0, obj.pts - 2, 2):
             self._draw_line(obj.pt[i].x, obj.pt[i].y, obj.pt[i + 1].x, obj.pt[i + 1].y, obj.back_colour)  # erase old obj
+        if hitbox and obj.exp < 1:
+            self._draw_circle(obj.x, obj.y, obj.coll, obj.back_colour)
         if (obj.exp > -1 and obj.tumble == 0) or (obj.size > 0 and obj.tumble != 0) or self.score.show:
-            self._move_object2(obj, explode)
+            self._move_object(obj, explode)
             c = obj.colour
             if self.ship.damage == False and obj.colour == self.display.green:
                 c = self.display.red
@@ -515,6 +531,8 @@ class AsteroidsGame:
                 c = self.white_shades[60 - obj.exp]
             for i in range(0, obj.pts - 2, 2):
                 self._draw_line(obj.pt[i].x, obj.pt[i].y, obj.pt[i + 1].x, obj.pt[i + 1].y, c)  # draw new obj
+            if hitbox and obj.exp < 1:
+                self._draw_circle(obj.x, obj.y, obj.coll, self.display.red)
     
     def _slow_ship(self):
         """Slow ship down automatically."""
@@ -529,7 +547,7 @@ class AsteroidsGame:
             self.ship.ay = 0
         '''
 
-    def _move_object2(self, obj, explode):
+    def _move_object(self, obj, explode):
         """Move and update object state."""
         if not obj.active:
             return
@@ -562,17 +580,12 @@ class AsteroidsGame:
             deg2 = int(obj.deg + obj.ptdeg[1 + i // 2]) - (obj.size // 150) * explode
             if deg2 > 359:
                 deg2 -= 360
-            if not explode:
-                obj.pt[i].x = int(obj.ptrad[i // 2] * obj.size * self.icos[deg1] // 10000 + obj.x)
-                obj.pt[i].y = int(obj.ptrad[i // 2] * obj.size * self.isin[deg1] // 10000 + obj.y)
-                obj.pt[i + 1].x = int(obj.ptrad[1 + i // 2] * obj.size * self.icos[deg2] // 10000 + obj.x)
-                obj.pt[i + 1].y = int(obj.ptrad[1 + i // 2] * obj.size * self.isin[deg2] // 10000 + obj.y)
-            else:
+            if explode:
                 obj.size += 10
-                obj.pt[i].x = int(obj.ptrad[i // 2] * obj.size * self.icos[deg1] // 10000 + obj.x)
-                obj.pt[i].y = int(obj.ptrad[i // 2] * obj.size * self.isin[deg1] // 10000 + obj.y)
-                obj.pt[i + 1].x = int(obj.ptrad[1 + i // 2] * obj.size * self.icos[deg2] // 10000 + obj.x)
-                obj.pt[i + 1].y = int(obj.ptrad[1 + i // 2] * obj.size * self.isin[deg2] // 10000 + obj.y)
+            obj.pt[i].x = int(obj.ptrad[i // 2] * obj.size * self.icos[deg1] // 10000 + obj.x)
+            obj.pt[i].y = int(obj.ptrad[i // 2] * obj.size * self.isin[deg1] // 10000 + obj.y)
+            obj.pt[i + 1].x = int(obj.ptrad[1 + i // 2] * obj.size * self.icos[deg2] // 10000 + obj.x)
+            obj.pt[i + 1].y = int(obj.ptrad[1 + i // 2] * obj.size * self.isin[deg2] // 10000 + obj.y)
     
     def _thrust(self):
         """Apply thrust to ship."""
@@ -690,23 +703,29 @@ class AsteroidsGame:
                 if objs[i].ay < 1000:
                     objs[i].ay += 200
                 objs[i].size = objs[last].size
-                objs[i].coll = objs[i].size * 5
+                objs[i].calc_coll(self.hitbox_scale)
                 objs[i].exp = 0
                 return
     
     def _move_miss_new(self):
         """Move missiles and check collisions."""
         for i in range(0, self.max_missiles):
-            if self.bullets[i].active and self.bullets[i].x > -self.SCALE and self.bullets[i].x < self.MAX_X + self.SCALE \
-                and self.bullets[i].y > -self.SCALE and self.bullets[i].y < self.MAX_Y + self.SCALE:
+            if (self.bullets[i].active and self.bullets[i].x > -self.SCALE and self.bullets[i].x < self.MAX_X + self.SCALE \
+                and self.bullets[i].y > -self.SCALE and self.bullets[i].y < self.MAX_Y + self.SCALE
+            ):
+                # Active bullet is within screen playing area.
+                # Erase it
                 self._draw_point(self.bullets[i].x, self.bullets[i].y, self.display.black)
+                # Move it
                 self.bullets[i].x = self.bullets[i].x + self.bullets[i].ax
                 self.bullets[i].y = self.bullets[i].y + self.bullets[i].ay
+                # Draw it randomly in red or white
                 if randint(0, 1):
                     c = self.red_shades[31]
                 else:
                     c = self.display.white
                 self._draw_point(self.bullets[i].x, self.bullets[i].y, c)
+                # Check asteroids for collision with bullet
                 for j in range(0, len(self.asteroid)):
                     if (self.asteroid[j].active and 
                         self.bullets[i].x < self.asteroid[j].x + self.asteroid[j].coll and 
@@ -717,18 +736,18 @@ class AsteroidsGame:
                         self.asteroid[j].exp == 0 and 
                         self.ship.damage
                     ):
+                        # Asteroid missile collision
                         self.display.pixel(int(self.bullets[i].x // self.SCALE), int(self.bullets[i].y // self.SCALE), self.display.black)
                         self.score.value += scoring[self.asteroid[j].size // self.SCALE]
                         self.asteroid[j].size -= self.SCALE
-                        self.asteroid[j].coll -= 3
                         if self.asteroid[j].size > 100:
                             self._spawn_asteroid(self.asteroid, j)
                             self._spawn_asteroid(self.asteroid, j)
-                        self.explode_clean_token = True
                         self.asteroid[j].exp = 1
                         self.asteroid[j].tumble = 0
                         self.asteroid[j].ax = 0
                         self.asteroid[j].ay = 0
+                        self._draw_circle(self.asteroid[j].x, self.asteroid[j].y, self.asteroid[j].coll, self.asteroid[j].back_colour)
                         self.bullets[i].active = False
             else:
                 self.bullets[i].active = False
@@ -741,7 +760,7 @@ class AsteroidsGame:
             if self.asteroid[i].active:
                 if self.asteroid[i].exp > 0:
                     self.asteroid[i].exp += 1
-                self._draw_object2(self.asteroid[i], (self.asteroid[i].exp > 0))
+                self._draw_object(self.asteroid[i], (self.asteroid[i].exp > 0), self.hitbox_debug)
                 if (self.ship.damage and self.ship.exp == 0 and 
                     self.ship.x < self.asteroid[i].x + self.asteroid[i].coll and 
                     self.ship.x > self.asteroid[i].x - self.asteroid[i].coll and 
@@ -750,8 +769,8 @@ class AsteroidsGame:
                     self.asteroid[i].exp == 0):
                     # Start ship explosion
                     self.ship.exp = 1
-                if self.asteroid[i].size > 5500 or self.asteroid[i].size < 1 or self.asteroid[i].exp > 59:
-                    self._draw_object2(self.asteroid[i], True)
+                if self.asteroid[i].size > 20000 or self.asteroid[i].size < 1 or self.asteroid[i].exp > 59:
+                    self._draw_object(self.asteroid[i], True)
                     self.asteroid[i].active = False
                     self.asteroid[i].exp = 0
     
@@ -911,7 +930,7 @@ class AsteroidsGame:
             
             self._slow_ship()
             self._ship_condition()   # Animates ship explosion and ends life and resets if fully exploded
-            self._draw_object2(self.ship, self.ship.exp > 0)
+            self._draw_object(self.ship, self.ship.exp > 0)
             self._move_miss_new()
             self.active_exhaust = self._show_exhaust()
             self._stars()
