@@ -57,7 +57,10 @@ def main():
             # Frame rate control
             if fps > 25:
                 sleep_time += 0.001
-                print(f"Sleep time: {sleep_time}")
+                print(f"Increased sleep: {sleep_time:.3f}")
+            elif fps < 20:
+                sleep_time += -0.001
+                print(f"Decreased sleep: {sleep_time:.3f}")
             sleep(sleep_time)
         except Exception:
             running = False
