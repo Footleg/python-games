@@ -113,8 +113,11 @@ class Hardware_Wrapper:
     def pixel(self, x, y, color):
         self.screen.set_at((int(x), int(y)), color)
 
-    def circle(self, x, y, radius, color):
-        pygame.draw.circle(self.screen, color, (int(x), int(y)), max(int(radius), 1))
+    def circle(self, x, y, radius, color, filled=True):
+        if filled:
+            pygame.draw.circle(self.screen, color, (int(x), int(y)), max(int(radius), 1))
+        else:
+            pygame.draw.circle(self.screen, color, (int(x), int(y)), max(int(radius), 1), width=1)
 
     def show(self):
         pygame.display.flip()

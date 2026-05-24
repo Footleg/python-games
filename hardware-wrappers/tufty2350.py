@@ -105,9 +105,12 @@ class Hardware_Wrapper:
     def pixel(self, x, y, colour):
         self.fill_rect(x, y, 2, 2, colour)
 
-    def circle(self, x, y, radius, colour):
+    def circle(self, x, y, radius, colour, filled=True):
          screen.pen = colour
-         screen.shape(shape.circle(int(x), int(y), max(int(radius), 1)))
+         if filled:
+            screen.shape(shape.circle(int(x), int(y), max(int(radius), 1)))
+         else:
+            screen.shape(shape.circle(int(x), int(y), max(int(radius), 1), False))
 
     def is_key_held(self, key):
         # Check if a key is currently being held
