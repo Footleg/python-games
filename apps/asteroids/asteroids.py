@@ -46,7 +46,7 @@ class Vector_Object():
         self.ay = 0 #randint(-40,40)*10 # accel y 
         self.deg = 0                 # degrees obj is pointing
         self.size = size             # size of obj
-        self.coll = self.size * 5    # collision h and w (converted to mean radius using calc_coll later)
+        self.coll = self.size        # collision h and w (converted to mean radius using calc_coll later)
         self.exp = 0                 # explode progression
         self.damage = True           # ship can take damage
         self.pt = []                 # active points
@@ -91,8 +91,9 @@ let_rad = []
 # Score digit definitions
 score_deg = []
 score_rad = []
-scoring = [0,100,50,30,20,15,10,4,2,1] # points
+scoring = [0,100,50,30,20,15,10,4,2,1] # points scored for each asteroid size
 
+# Objects are defined in terms of radial coordinates by an array of angles and an array of distances from the centre
 let_deg.append([54,270,126,90,54])                      # A
 let_rad.append([17,18,17,4,17])
 let_deg.append([306,270,234,54,90,126])                 # S
@@ -116,25 +117,25 @@ let_rad.append( [17, 17, 0, 17, 17] )
 let_deg.append( [234, 90, 306] )                        # V
 let_rad.append( [17, 18, 17] )
 
-score_deg.append( [306, 270, 234, 126, 90, 54, 306] )   # 0
+score_deg.append( [306, 270, 234, 126, 90, 54, 306] )    # 0
 score_rad.append( [17, 18, 17, 17, 18, 17, 17] )
-score_deg.append( [90, 270, 234] )                      # 1
+score_deg.append( [90, 270, 234] )                       # 1
 score_rad.append( [18, 18, 17] )                        
-score_deg.append( [234, 270, 306, 126, 90, 54] )        # 2
+score_deg.append( [234, 270, 306, 126, 90, 54] )         # 2
 score_rad.append( [17, 18, 17, 17, 18, 17] )            
-score_deg.append( [234, 270, 306, 0, 54, 90, 126] )     # 3
+score_deg.append( [234, 270, 306, 0, 54, 90, 126] )      # 3
 score_rad.append( [17, 18, 17, 0, 17, 18, 17] )         
-score_deg.append( [90, 270, 180, 0] )                   # 4
+score_deg.append( [90, 270, 180, 0] )                    # 4
 score_rad.append( [18, 18, 18, 0] )
 score_deg.append( [306, 270, 234, 180, 0, 54, 90, 126] ) # 5
 score_rad.append( [17, 18, 17, 10, 10, 17, 18, 17] )
-score_deg.append( [306, 270, 234, 126, 90, 54, 0, 180] ) #6
+score_deg.append( [306, 270, 234, 126, 90, 54, 0, 180] ) # 6
 score_rad.append( [17, 18, 17, 17, 18, 17, 0, 10] ) 
-score_deg.append( [234, 270, 306, 90] )                  #7
+score_deg.append( [234, 270, 306, 90] )                  # 7
 score_rad.append( [17, 18, 17, 18] )
-score_deg.append( [270, 306, 126, 90, 54, 234, 270] )    #8
+score_deg.append( [270, 306, 126, 90, 54, 234, 270] )    # 8
 score_rad.append( [18, 17, 17, 18, 17, 17, 18] )
-score_deg.append( [306, 0, 234, 270, 306, 90] )          #9
+score_deg.append( [306, 0, 234, 270, 306, 90] )          # 9
 score_rad.append( [17, 0, 17, 18, 17, 18] )
 
 
@@ -185,6 +186,7 @@ class AsteroidsGame:
 
         # Single objects
         self.ship = self._init_obj([0, 140, 220, 0], [3, 3, 3, 3], 8, 0, self.MAX_X // 2, self.MAX_Y // 2, 3 * self.SCALE)
+        self.ship.coll = self.ship.size * 5 # Sets size of shield collision boundary
         self.ship.colour = self.display.green
         
         # Game object lists
@@ -454,9 +456,18 @@ class AsteroidsGame:
     def _init_asteroids(self):
         """Create asteroids list one time."""
         for j in range(0, self.max_asteroids):
-            self.asteroid.append(self._init_obj([0, 60, 120, 180, 240, 300, 0],
-                                                [7] + [randint(6, 9) for _ in range(5)] + [7],
-                                                14, rotn[randint(0, 5)], 0, 0, 3 * self.SCALE + 1))
+            degs = [0]
+            angle = randint(0, 30) + 45
+            while angle < 360:
+                degs.append(angle)
+                angle += randint(0, 30) + 45
+            if degs[len(degs)-1] > 320:
+                degs[len(degs)-1] = 0
+            else:
+                degs.append(0)
+            self.asteroid.append(self._init_obj(degs,
+                                                [14] + [randint(12, 17) for _ in range(len(degs) - 2)] + [14],
+                                                len(degs)*2, rotn[randint(0, 5)], 0, 0, 3 * self.SCALE + 1))
             self._perimeter(self.asteroid[j], self.MAX_X, self.MAX_Y)
             self.asteroid[j].ax = randint(-40, 40) * 40
             self.asteroid[j].ay = randint(-40, 40) * 40
@@ -516,12 +527,83 @@ class AsteroidsGame:
         """Draw a pixel, scaled to screen co-ordinates."""
         self.display.pixel(int(x // self.SCALE), int(y // self.SCALE), colour)
     
+    def _draw_object_lines(self, obj, hitbox, colour):
+        wrap_x_min = False
+        wrap_y_min = False
+        wrap_x_max = False
+        wrap_y_max = False
+        drawHitbox = hitbox and obj.exp < 1
+        col_main = colour
+        col_x_min = colour
+        col_y_min = colour
+        col_x_max = colour
+        col_y_max = colour
+        col_xy_wrap = colour
+        if drawHitbox:
+            if colour != self.display.black:
+                col_main = self.display.red
+                col_x_min = self.display.magenta
+                col_y_min = self.display.yellow
+                col_x_max = self.display.cyan
+                col_y_max = self.display.blue
+                col_xy_wrap = self.display.green
+            self._draw_circle(obj.x, obj.y, obj.coll, col_main)
+        
+        # Draw copy if wrapping over screen boundary
+        if obj.x - obj.coll < 0:
+            wrap_x_min = True
+            if drawHitbox:
+                self._draw_circle(obj.x + self.MAX_X, obj.y, obj.coll, col_x_min)
+        elif obj.x + obj.coll > self.MAX_X - 2:
+            wrap_x_max = True
+            if drawHitbox:
+                self._draw_circle(obj.x - self.MAX_X, obj.y, obj.coll, col_x_max)
+        if obj.y - obj.coll < 0:
+            wrap_y_min = True
+            if drawHitbox:
+                self._draw_circle(obj.x, obj.y + self.MAX_Y, obj.coll, col_y_min)
+        elif obj.y + obj.coll > self.MAX_Y - 2:
+            wrap_y_max = True
+            if drawHitbox:
+                self._draw_circle(obj.x, obj.y - self.MAX_Y, obj.coll, col_y_max)
+
+        if drawHitbox:
+            # Consider corner cases also
+            if wrap_x_min and wrap_y_min:
+                self._draw_circle(obj.x + self.MAX_X, obj.y + self.MAX_Y, obj.coll, col_xy_wrap)
+            elif wrap_x_min and wrap_y_max:
+                self._draw_circle(obj.x + self.MAX_X, obj.y - self.MAX_Y, obj.coll, col_xy_wrap)
+            elif wrap_x_max and wrap_y_min:
+                self._draw_circle(obj.x - self.MAX_X, obj.y + self.MAX_Y, obj.coll, col_xy_wrap)
+            elif wrap_x_max and wrap_y_max:
+                self._draw_circle(obj.x - self.MAX_X, obj.y - self.MAX_Y, obj.coll, col_xy_wrap)
+
+        # Draw object lines
+        for i in range(0, obj.pts - 2, 2):
+            self._draw_line(obj.pt[i].x, obj.pt[i].y, obj.pt[i + 1].x, obj.pt[i + 1].y, colour)
+            # Draw copy if wrapping over screen boundary
+            if wrap_x_min and (obj.pt[i].x < 0 or obj.pt[i + 1].x < 0):
+                self._draw_line(obj.pt[i].x + self.MAX_X, obj.pt[i].y, obj.pt[i + 1].x + self.MAX_X, obj.pt[i + 1].y, colour)
+            elif wrap_x_max and (obj.pt[i].x > self.MAX_X or obj.pt[i + 1].x > self.MAX_X):
+                self._draw_line(obj.pt[i].x - self.MAX_X, obj.pt[i].y, obj.pt[i + 1].x - self.MAX_X, obj.pt[i + 1].y, colour)
+            if wrap_y_min and (obj.pt[i].y < 0 or obj.pt[i + 1].y < 0):
+                self._draw_line(obj.pt[i].x, obj.pt[i].y + self.MAX_Y, obj.pt[i + 1].x, obj.pt[i + 1].y + self.MAX_Y, colour)
+            elif wrap_y_max and (obj.pt[i].y > self.MAX_Y or obj.pt[i + 1].y > self.MAX_Y):
+                self._draw_line(obj.pt[i].x, obj.pt[i].y - self.MAX_Y, obj.pt[i + 1].x, obj.pt[i + 1].y - self.MAX_Y, colour)
+            # Consider corner cases also
+            if wrap_x_min and wrap_y_min and (obj.pt[i].x < 0 or obj.pt[i + 1].x < 0 or obj.pt[i].y < 0 or obj.pt[i + 1].y < 0):
+                self._draw_line(obj.pt[i].x + self.MAX_X, obj.pt[i].y + self.MAX_Y, obj.pt[i + 1].x + self.MAX_X, obj.pt[i + 1].y + self.MAX_Y, colour)
+            elif wrap_x_min and wrap_y_max and (obj.pt[i].x < 0 or obj.pt[i + 1].x < 0 or obj.pt[i].y > self.MAX_Y or obj.pt[i + 1].y > self.MAX_Y):
+                self._draw_line(obj.pt[i].x + self.MAX_X, obj.pt[i].y - self.MAX_Y, obj.pt[i + 1].x + self.MAX_X, obj.pt[i + 1].y - self.MAX_Y, colour)
+            elif wrap_x_max and wrap_y_min and (obj.pt[i].x > self.MAX_X or obj.pt[i + 1].x > self.MAX_X or obj.pt[i].y < 0 or obj.pt[i + 1].y < 0):
+                self._draw_line(obj.pt[i].x - self.MAX_X, obj.pt[i].y + self.MAX_Y, obj.pt[i + 1].x - self.MAX_X, obj.pt[i + 1].y + self.MAX_Y, colour)
+            elif wrap_x_max and wrap_y_max and (obj.pt[i].x > self.MAX_X or obj.pt[i + 1].x > self.MAX_X or obj.pt[i].y > self.MAX_Y or obj.pt[i + 1].y > self.MAX_Y):
+                self._draw_line(obj.pt[i].x - self.MAX_X, obj.pt[i].y - self.MAX_Y, obj.pt[i + 1].x - self.MAX_X, obj.pt[i + 1].y - self.MAX_Y, colour)
+
+   
     def _draw_object(self, obj, explode, hitbox=False):
         """Draw game object."""
-        for i in range(0, obj.pts - 2, 2):
-            self._draw_line(obj.pt[i].x, obj.pt[i].y, obj.pt[i + 1].x, obj.pt[i + 1].y, obj.back_colour)  # erase old obj
-        if hitbox and obj.exp < 1:
-            self._draw_circle(obj.x, obj.y, obj.coll, obj.back_colour)
+        self._draw_object_lines(obj, hitbox, obj.back_colour)
         if (obj.exp > -1 and obj.tumble == 0) or (obj.size > 0 and obj.tumble != 0) or self.score.show:
             self._move_object(obj, explode)
             c = obj.colour
@@ -529,11 +611,8 @@ class AsteroidsGame:
                 c = self.display.red
             if obj.exp > 30:
                 c = self.white_shades[60 - obj.exp]
-            for i in range(0, obj.pts - 2, 2):
-                self._draw_line(obj.pt[i].x, obj.pt[i].y, obj.pt[i + 1].x, obj.pt[i + 1].y, c)  # draw new obj
-            if hitbox and obj.exp < 1:
-                self._draw_circle(obj.x, obj.y, obj.coll, self.display.red)
-    
+            self._draw_object_lines(obj, hitbox, c)
+
     def _slow_ship(self):
         """Slow ship down automatically."""
         if self.ship.ax != 0:
@@ -727,7 +806,7 @@ class AsteroidsGame:
                 self._draw_point(self.bullets[i].x, self.bullets[i].y, c)
                 # Check asteroids for collision with bullet
                 for j in range(0, len(self.asteroid)):
-                    if (self.asteroid[j].active and 
+                    if (self.asteroid[j].active and self.bullets[i].active and
                         self.bullets[i].x < self.asteroid[j].x + self.asteroid[j].coll and 
                         self.bullets[i].x > self.asteroid[j].x - self.asteroid[j].coll and 
                         self.bullets[i].y < self.asteroid[j].y + self.asteroid[j].coll and 
@@ -747,7 +826,9 @@ class AsteroidsGame:
                         self.asteroid[j].tumble = 0
                         self.asteroid[j].ax = 0
                         self.asteroid[j].ay = 0
-                        self._draw_circle(self.asteroid[j].x, self.asteroid[j].y, self.asteroid[j].coll, self.asteroid[j].back_colour)
+                        if self.hitbox_debug:
+                            # Erase hitbox as asteroid is destroyed
+                            self._draw_circle(self.asteroid[j].x, self.asteroid[j].y, self.asteroid[j].coll, self.asteroid[j].back_colour)
                         self.bullets[i].active = False
             else:
                 self.bullets[i].active = False
@@ -769,7 +850,7 @@ class AsteroidsGame:
                     self.asteroid[i].exp == 0):
                     # Start ship explosion
                     self.ship.exp = 1
-                if self.asteroid[i].size > 20000 or self.asteroid[i].size < 1 or self.asteroid[i].exp > 59:
+                if self.asteroid[i].size < 1 or self.asteroid[i].exp > 59:
                     self._draw_object(self.asteroid[i], True)
                     self.asteroid[i].active = False
                     self.asteroid[i].exp = 0
