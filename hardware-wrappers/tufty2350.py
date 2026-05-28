@@ -81,6 +81,8 @@ class Hardware_Wrapper:
         self.red = color.rgb(255, 0, 0)
         self.green = color.rgb(0, 255, 0)
         self.blue = color.rgb(0, 0, 255)
+        self.cyan = color.rgb(0, 255, 255)
+        self.magenta = color.rgb(255, 0, 255)
         self.yellow = color.rgb(255, 255, 0)
 
     def show(self):
@@ -106,11 +108,11 @@ class Hardware_Wrapper:
         self.fill_rect(x, y, 2, 2, colour)
 
     def circle(self, x, y, radius, colour, filled=True):
-         screen.pen = colour
-         if filled:
-            screen.shape(shape.circle(int(x), int(y), max(int(radius), 1)))
-         else:
-            screen.shape(shape.circle(int(x), int(y), max(int(radius), 1), False))
+        screen.pen = colour
+        screen.shape(shape.circle(int(x), int(y), max(int(radius), 1)))
+        if filled == False:
+            screen.pen = self.black
+            screen.shape(shape.circle(int(x), int(y), max(int(radius - 1), 1), 1))
 
     def is_key_held(self, key):
         # Check if a key is currently being held
