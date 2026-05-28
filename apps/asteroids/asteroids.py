@@ -46,6 +46,7 @@ class Vector_Object():
         self.ay = 0 #randint(-40,40)*10 # accel y 
         self.deg = 0                 # degrees obj is pointing
         self.size = size             # size of obj
+        self.scale = 1.0             # scale of obj
         self.coll = self.size        # collision h and w (converted to mean radius using calc_coll later)
         self.exp = 0                 # explode progression
         self.damage = True           # ship can take damage
@@ -65,7 +66,7 @@ class Vector_Object():
         mean_rad = 0
         for i in range(len(self.ptrad)-1):
             mean_rad += self.ptrad[i];
-        mean_rad = int(self.size * scale * mean_rad) // (len(self.ptrad)-1)
+        mean_rad = int(self.size * self.scale * scale * mean_rad) // (len(self.ptrad)-1)
         self.coll = mean_rad
 
 class Score():
@@ -468,6 +469,7 @@ class AsteroidsGame:
             self.asteroid.append(self._init_obj(degs,
                                                 [14] + [randint(12, 17) for _ in range(len(degs) - 2)] + [14],
                                                 len(degs)*2, rotn[randint(0, 5)], 0, 0, 3 * self.SCALE + 1))
+            self.asteroid[j].scale = 0.5
             self._perimeter(self.asteroid[j], self.MAX_X, self.MAX_Y)
             self.asteroid[j].ax = randint(-40, 40) * 40
             self.asteroid[j].ay = randint(-40, 40) * 40
@@ -647,24 +649,25 @@ class AsteroidsGame:
             obj.y = self.MAX_Y
         
         obj.deg += obj.tumble
-        if obj.deg > 359:
+        while obj.deg > 359:
             obj.deg -= 360
-        if obj.deg < 0:
+        while obj.deg < 0:
             obj.deg += 360
         
+        # Recalculate coordinates of all points in the vector for object position, rotation, scale and explode state
         for i in range(0, obj.pts - 2, 2):
             deg1 = int(obj.deg + obj.ptdeg[i // 2]) + (obj.size // 150) * explode
-            if deg1 > 359:
+            while deg1 > 359:
                 deg1 -= 360
             deg2 = int(obj.deg + obj.ptdeg[1 + i // 2]) - (obj.size // 150) * explode
-            if deg2 > 359:
+            while deg2 > 359:
                 deg2 -= 360
             if explode:
                 obj.size += 10
-            obj.pt[i].x = int(obj.ptrad[i // 2] * obj.size * self.icos[deg1] // 10000 + obj.x)
-            obj.pt[i].y = int(obj.ptrad[i // 2] * obj.size * self.isin[deg1] // 10000 + obj.y)
-            obj.pt[i + 1].x = int(obj.ptrad[1 + i // 2] * obj.size * self.icos[deg2] // 10000 + obj.x)
-            obj.pt[i + 1].y = int(obj.ptrad[1 + i // 2] * obj.size * self.isin[deg2] // 10000 + obj.y)
+            obj.pt[i].x = int(obj.ptrad[i // 2] * obj.size * obj.scale * self.icos[deg1] // 10000 + obj.x)
+            obj.pt[i].y = int(obj.ptrad[i // 2] * obj.size * obj.scale * self.isin[deg1] // 10000 + obj.y)
+            obj.pt[i + 1].x = int(obj.ptrad[1 + i // 2] * obj.size * obj.scale * self.icos[deg2] // 10000 + obj.x)
+            obj.pt[i + 1].y = int(obj.ptrad[1 + i // 2] * obj.size * obj.scale * self.isin[deg2] // 10000 + obj.y)
     
     def _thrust(self):
         """Apply thrust to ship."""
