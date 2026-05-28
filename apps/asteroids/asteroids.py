@@ -172,7 +172,7 @@ class AsteroidsGame:
         
         # Game parameters affecting difficulty. Some depend on screen area
         self.asteroid_max_size = int(sqrt(hardware.width / 30))
-        self.initial_asteroids = 1 + hardware.width // 250
+        self.initial_asteroids = max(1, hardware.width // (50 * 2**(self.asteroid_max_size-2)))
         self.asteroid_inc = max(self.initial_asteroids // 2, 1)
         self.max_asteroids = (self.initial_asteroids + self.asteroid_inc * 10) * self.asteroid_max_size # Max 10 levels
         self.max_missiles = hardware.width // 40
